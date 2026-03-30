@@ -1,0 +1,32 @@
+<resources>
+    <string name="app_name">कृषिनूर</string>
+    <string name="welcome_back">कृषिनूर में आपका स्वागत है</string>
+    <string name="smart_farming">AI के साथ स्मार्ट खेती</string>
+    <string name="login">लॉगिन</string>
+    <string name="phone_number">फ़ोन नंबर</string>
+    <string name="password">पासवर्ड</string>
+    <string name="sign_in">साइन इन करें</string>
+    <string name="new_here_create_account">नए हैं? खाता बनाएं</string>
+    <string name="uav_system">सहकारी UAV स्मार्ट फार्मिंग सिस्टम</string>
+    <string name="please_fill_all_fields">कृपया सभी फ़ील्ड भरें</string>
+    <string name="invalid_credentials">अमान्य क्रेडेंशियल</string>
+    <string name="create_account">खाता बनाएं</string>
+    <string name="name">नाम</string>
+    <string name="location">स्थान</string>
+    <string name="already_have_account">पहले से ही एक खाता है? लॉगिन करें</string>
+    <string name="welcome_farmer">स्वागत है, %1$s! 🌿</string>
+    <string name="smart_farming_subtitle">स्मार्ट फार्मिंग - UAV - AI रोग पहचान</string>
+    <string name="version_info">v1.0 - माइनर प्रोजेक्ट 2025</string>
+    <string name="good_morning">शुभ प्रभात</string>
+    <string name="good_afternoon">नमस्कार (दोपहर)</string>
+    <string name="good_evening">शुभ संध्या</string>
+    <string name="scan_plant">पौधे को स्कैन करें</string>
+    <string name="new_scan">नया स्कैन</string>
+    <string name="history">इतिहास</string>
+    <string name="total_scans">कुल स्कैन</string>
+    <string name="diseased">रोगग्रस्त</string>
+    <string name="healthy">स्वस्थ</string>
+    <string name="last_scan">पिछला स्कैन</string>
+    <string name="view_more">देखें →</string>
+    <string name="logout">लॉगआउट</string>
+</resources>

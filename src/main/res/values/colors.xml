@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Updated Green Palette: Replaced dark shades with lighter, more vibrant ones -->
+    <color name="brand_forest_deep">#43A047</color> <!-- Light Primary Green -->
+    <color name="brand_green_primary">#66BB6A</color>
+    <color name="brand_green_light">#C8E6C9</color>
+
+    <!-- Background: Very Light Green / Mint -->
+    <color name="brand_cream_bg">#F1F8E9</color>
+
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+
+    <!-- Text Colors -->
+    <color name="text_dark">#2E7D32</color>
+    <color name="text_grey">#616161</color>
+
+    <!-- Status Colors -->
+    <color name="status_diseased">#EF5350</color>
+    <color name="status_healthy">#4CAF50</color>
+    <color name="accent_gold">#FFD54F</color>
+
+    <!-- UI Elements -->
+    <color name="card_bg">#FFFFFF</color>
+    <color name="divider">#E0E0E0</color>
+    <color name="warning_amber">#FFCA28</color>
+    <color name="sky_blue">#29B6F6</color>
+    <color name="grid_line">#1A43A047</color>
+
+    <!-- Map old names to new ones to fix drawable and kotlin errors -->
+    <color name="accent_primary">@color/brand_forest_deep</color>
+    <color name="bg_surface">@color/white</color>
+    <color name="disease_red">@color/status_diseased</color>
+    <color name="healthy_green">@color/status_healthy</color>
+    <color name="bg_card">@color/white</color>
+    <color name="accent_glow">#4043A047</color>
+
+    <!-- Legacy / Compatibility -->
+    <color name="app_bg_light">#F1F8E9</color>
+    <color name="brand_green_dark">#2E7D32</color>
+    <color name="card_bg_white">#FFFFFF</color>
+    <color name="text_main">#2E7D32</color>
+    <color name="text_sub">#616161</color>
+    <color name="divider_light">#E0E0E0</color>
+</resources>
