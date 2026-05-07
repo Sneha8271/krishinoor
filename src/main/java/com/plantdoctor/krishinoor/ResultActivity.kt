@@ -38,29 +38,38 @@ class ResultActivity : AppCompatActivity() {
         val json       = JSONObject(jsonStr)
         val plantName  = json.optString("plant_name", "Unknown")
         val disease    = json.optString("disease", "Unknown")
-        val confidence = json.optString("confidence", "0")
+        val confidence = json.optString("confidence", "0").toFloatOrNull() ?: 0f
+        val severity   = json.optString("severity", "N/A")
         val solution   = json.optString("solution", getSolution(disease))
-        val isHealthy  = disease.contains("healthy", ignoreCase = true)
+        val isHealthy  = json.optBoolean("is_healthy", disease.contains("healthy", ignoreCase = true))
         val gridCoord  = json.optString("grid_coordinate", latLonToGrid(lat, lng))
 
-        // Plant name & confidence
-        binding.plantNameText.text  = plantName
-        binding.confidenceText.text = "Confidence: $confidence%"
-        binding.confidenceBar.progress = confidence.toFloatOrNull()?.toInt() ?: 0
+        // Confidence Threshold Check
+        val isReliable = confidence > 60.0f
 
-        // Disease status
+        // Plant name & confidence
+        if (isReliable) {
+            binding.plantNameText.text  = plantName
+            binding.confidenceText.text = "Confidence: ${"%.1f".format(confidence)}%"
+        } else {
+            binding.plantNameText.text  = "Inconclusive ($plantName?)"
+            binding.confidenceText.text = "⚠️ Low Confidence: ${"%.1f".format(confidence)}% (Try a clearer photo)"
+        }
+        binding.confidenceBar.progress = confidence.toInt()
+
+        // Disease status & Severity
         if (isHealthy) {
             binding.diseaseText.text = "✅ Healthy Plant"
             binding.diseaseText.setTextColor(getColor(R.color.healthy_green))
             binding.statusBadge.text = "HEALTHY"
-            binding.statusBadge.setBackgroundColor(getColor(R.color.healthy_green))
+            binding.statusBadge.backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.healthy_green))
             binding.statusBadge.setTextColor(getColor(R.color.white))
             binding.statusIcon.text = "✅"
         } else {
-            binding.diseaseText.text = "⚠️ $disease"
+            binding.diseaseText.text = "⚠️ $disease (Severity: $severity)"
             binding.diseaseText.setTextColor(getColor(R.color.disease_red))
             binding.statusBadge.text = "DISEASED"
-            binding.statusBadge.setBackgroundColor(getColor(R.color.disease_red))
+            binding.statusBadge.backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.disease_red))
             binding.statusBadge.setTextColor(getColor(R.color.white))
             binding.statusIcon.text = "⚠️"
         }

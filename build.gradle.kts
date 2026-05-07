@@ -14,11 +14,18 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+    }
+
+    androidResources {
+        noCompress += "ptl"
     }
 
     buildFeatures {
         viewBinding = true
-        dataBinding = false
     }
 
     buildTypes {
@@ -28,18 +35,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            packaging {
-                jniLibs {
-                    useLegacyPackaging = true
-                }
-            }
-        }
-        debug {
-            packaging {
-                jniLibs {
-                    useLegacyPackaging = true
-                }
-            }
         }
     }
 
@@ -51,6 +46,21 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE*"
+            excludes += "META-INF/NOTICE*"
+            excludes += "META-INF/*.kotlin_module"
+            pickFirsts.add("META-INF/versions/9/previous-compilation-data.bin")
+        }
+        jniLibs {
+            useLegacyPackaging = true
+            pickFirsts.add("**/libc++_shared.so")
+        }
+    }
 }
 
 dependencies {
@@ -59,13 +69,18 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.google.android.gms:play-services-location:21.2.0")
-    implementation("androidx.camera:camera-camera2:1.3.3")
-    implementation("androidx.camera:camera-lifecycle:1.3.3")
-    implementation("androidx.camera:camera-view:1.3.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation(libs.okhttp)
+    implementation(libs.play.services.location)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.exifinterface)
+
+    // PyTorch Mobile 2.1.0 — matches Colab torch 2.x
+    // Change back to:
+    implementation("org.pytorch:pytorch_android_lite:1.13.1")
+    implementation("org.pytorch:pytorch_android_torchvision_lite:1.13.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -9,7 +9,6 @@ import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
-import android.util.Base64
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,16 +18,11 @@ import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import com.google.android.gms.location.*
 import com.plantdoctor.krishinoor.databinding.ActivityScanBinding
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.TimeUnit
+
 
 class ScanActivity : AppCompatActivity() {
 
@@ -39,16 +33,7 @@ class ScanActivity : AppCompatActivity() {
     private var photoFilePath: String? = null
     private var capturedBitmap: Bitmap? = null
 
-    // ⚠️ CHANGE THIS URL:
-    // Emulator  → "http://10.0.2.2:8000/predict"
-    // Real phone (same WiFi) → "http://192.168.X.X:8000/predict"
-    // Deployed  → "https://your-app.railway.app/predict"
-    private val API_URL = "http://10.6.156.134:8000/predict"
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .build()
+    private lateinit var classifier: PlantDiseaseClassifier
 
     private val takePicture =
         registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -64,6 +49,8 @@ class ScanActivity : AppCompatActivity() {
     private val pickImage =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let {
+                photoUri = it
+                photoFilePath = null
                 val stream = contentResolver.openInputStream(it)
                 capturedBitmap = BitmapFactory.decodeStream(stream)
                 showPreview()
@@ -86,6 +73,17 @@ class ScanActivity : AppCompatActivity() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         requestPermissionsAndLocation()
 
+        // Diagnostic - check what's in assets
+        try {
+            val files = assets.list("")
+            android.util.Log.d("AssetCheck", "Assets found: ${files?.joinToString()}")
+        } catch (e: Exception) {
+            android.util.Log.e("AssetCheck", "Error listing assets: ${e.message}")
+        }
+
+// Initialize offline ML Engine
+        classifier = PlantDiseaseClassifier(this)
+
         binding.backBtn.setOnClickListener { finish() }
 
         binding.cameraBtn.setOnClickListener {
@@ -101,7 +99,7 @@ class ScanActivity : AppCompatActivity() {
         }
 
         binding.analyzeBtn.setOnClickListener {
-            capturedBitmap?.let { analyzeImage(it) }
+            capturedBitmap?.let { analyzeImage(it, photoUri) }
         }
     }
 
@@ -140,17 +138,33 @@ class ScanActivity : AppCompatActivity() {
     }
 
     private fun requestPermissionsAndLocation() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.CAMERA,
-                Manifest.permission.ACCESS_FINE_LOCATION), 101
-        )
+        val requestPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+                getLastLocation()
+            }
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.CAMERA)
+            )
+        } else {
+            getLastLocation()
+        }
+    }
+
+    private fun getLastLocation() {
         if (ActivityCompat.checkSelfPermission(
-                this, Manifest.permission.ACCESS_FINE_LOCATION)
-            == PackageManager.PERMISSION_GRANTED) {
+                this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
-                currentLocation = loc
-                loc?.let { updateGpsDisplay(it.latitude, it.longitude) }
+                if (loc != null) {
+                    currentLocation = loc
+                    updateGpsDisplay(loc.latitude, loc.longitude)
+                } else {
+                    binding.gpsText.text = "📍 Awaiting GPS fix..."
+                }
             }
         }
     }
@@ -158,11 +172,30 @@ class ScanActivity : AppCompatActivity() {
     private fun latLonToGrid(lat: Double, lng: Double): String {
         val latDir = if (lat >= 0) "N" else "S"
         val lonDir = if (lng >= 0) "E" else "W"
-        return "$latDir${"%.3f".format(Math.abs(lat))}°" +
-                " $lonDir${"%.3f".format(Math.abs(lng))}°"
+        return "$latDir${"%.3f".format(kotlin.math.abs(lat))}°" +
+                " $lonDir${"%.3f".format(kotlin.math.abs(lng))}°"
     }
 
-    private fun analyzeImage(bitmap: Bitmap) {
+    private fun getRotation(filePath: String?, uri: Uri? = null): Int {
+        return try {
+            val exif = if (uri != null) {
+                contentResolver.openInputStream(uri).use { s -> s?.let { ExifInterface(it) } }
+            } else if (filePath != null) {
+                ExifInterface(filePath)
+            } else null
+
+            val orientation = exif?.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90  -> 90
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                else -> 0
+            }
+        } catch (_: Exception) { 0 }
+    }
+
+    private fun analyzeImage(bitmap: Bitmap, uri: Uri? = null) {
         binding.loadingLayout.visibility = View.VISIBLE
         binding.analyzeBtn.isEnabled = false
 
@@ -171,66 +204,64 @@ class ScanActivity : AppCompatActivity() {
         val lat = currentLocation?.latitude ?: 0.0
         val lng = currentLocation?.longitude ?: 0.0
 
-        val out = ByteArrayOutputStream()
-        scaleBitmap(bitmap, 800).compress(Bitmap.CompressFormat.JPEG, 80, out)
-        val b64 = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
-
         saveBitmapToCache(bitmap)
 
-        val json = JSONObject().apply {
-            put("image", b64)
-            put("latitude", lat)
-            put("longitude", lng)
-            put("timestamp", timestamp)
-        }
+        // Get rotation from file path or Uri
+        val rotation = getRotation(photoFilePath, uri)
 
-        val request = Request.Builder().url(API_URL)
-            .post(json.toString().toRequestBody("application/json".toMediaType()))
-            .build()
+        // Offline ML Inference powered by PyTorch Mobile
+        Thread {
+            try {
+                // Run inference
+                val prediction = classifier.predict(bitmap, rotation)
 
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
+                // Parse raw label e.g. "Tomato___Late_blight"
+                val parts     = prediction.label.split("___")
+                val plantName = parts[0].replace("_", " ")
+                val disease   = if (parts.size > 1)
+                    parts[1].replace("_", " ")
+                else
+                    prediction.label.replace("_", " ")
+
+                // ✅ Get real severity + remedy from DiseaseDatabase
+                val info = DiseaseDatabase.getInfo(prediction.label)
+
+                val jsonStr = JSONObject().apply {
+                    put("plant_name", plantName)
+                    put("disease",    disease)
+                    put("confidence", "%.1f".format(prediction.confidence))
+                    put("severity",   info.severity)   // real severity
+                    put("solution",   info.solution)   // real remedy steps
+                    put("is_healthy", disease.contains("healthy", ignoreCase = true))
+                }.toString()
+
                 runOnUiThread {
                     hideLoading()
-                    Toast.makeText(this@ScanActivity,
-                        "❌ Cannot reach backend!\n" +
-                                "Make sure uvicorn is running.\n${e.message}",
-                        Toast.LENGTH_LONG).show()
+                    startActivity(
+                        Intent(this@ScanActivity, ResultActivity::class.java).apply {
+                            putExtra("json_response", jsonStr)
+                            putExtra("timestamp",     timestamp)
+                            putExtra("latitude",      lat)
+                            putExtra("longitude",     lng)
+                        }
+                    )
                 }
-            }
-            override fun onResponse(call: Call, response: Response) {
-                val body = response.body?.string()
+            } catch (e: Exception) {
                 runOnUiThread {
                     hideLoading()
-                    if (response.isSuccessful && body != null) {
-                        startActivity(
-                            Intent(this@ScanActivity, ResultActivity::class.java).apply {
-                                putExtra("json_response", body)
-                                putExtra("timestamp", timestamp)
-                                putExtra("latitude", lat)
-                                putExtra("longitude", lng)
-                            }
-                        )
-                    } else {
-                        Toast.makeText(this@ScanActivity,
-                            "Server error ${response.code}",
-                            Toast.LENGTH_LONG).show()
-                    }
+                    Toast.makeText(
+                        this@ScanActivity,
+                        "Inference failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
-        })
-    }
-
-    private fun scaleBitmap(bmp: Bitmap, max: Int): Bitmap {
-        val r = minOf(max.toFloat() / bmp.width, max.toFloat() / bmp.height)
-        if (r >= 1f) return bmp
-        return Bitmap.createScaledBitmap(
-            bmp, (bmp.width * r).toInt(), (bmp.height * r).toInt(), true)
+        }.start()
     }
 
     private fun saveBitmapToCache(bmp: Bitmap) {
         try {
-            val f = File(cacheDir, "scan_preview.jpg")
+            val f  = File(cacheDir, "scan_preview.jpg")
             val os = f.outputStream()
             bmp.compress(Bitmap.CompressFormat.JPEG, 85, os)
             os.close()
