@@ -11,7 +11,7 @@
 
 ---
 
-## 📱 App Screenshots
+## 📱 App Structure
 
 | Login & Language | Dashboard | Scan Plant |
 |:---:|:---:|:---:|
